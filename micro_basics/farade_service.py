@@ -8,7 +8,7 @@ app = Flask(__name__)
 LOGGING_SERVICE_URL = 'http://localhost:5001/logs'
 MESSAGES_SERVICE_URL = 'http://localhost:5002/messages'
 
-@app.route('/post', methods=['POST'])
+@app.route('/', methods=['POST'])
 def handle_post():
     msg = request.json.get("msg")
     msg_id = str(uuid.uuid4())
@@ -25,7 +25,7 @@ def handle_post():
     }
     return jsonify(combined_response), 200
 
-@app.route('/get', methods=['GET'])
+@app.route('/', methods=['GET'])
 def handle_get():
     log_response = requests.get(LOGGING_SERVICE_URL).json()
     msg_response = requests.get(MESSAGES_SERVICE_URL).json()
