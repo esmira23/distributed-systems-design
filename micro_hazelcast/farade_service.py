@@ -7,7 +7,6 @@ from pyotp import random
 app = Flask(__name__)
 
 MESSAGES_SERVICE_URL = 'http://localhost:5004/messages'
-# logging_service_url
 
 @app.route('/', methods=['POST'])
 def handle_post():
