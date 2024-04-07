@@ -2,9 +2,6 @@ from flask import Flask, jsonify
 import hazelcast
 import argparse
 import hazelcast.listener
-from queue import Queue
-import time
-import json
 from threading import Thread
 
 
