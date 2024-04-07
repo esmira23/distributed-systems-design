@@ -1,7 +1,6 @@
 from flask import Flask, jsonify
 import hazelcast
 import argparse
-import hazelcast.listener
 from threading import Thread
 
 
