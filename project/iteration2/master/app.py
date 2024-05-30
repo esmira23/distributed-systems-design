@@ -25,20 +25,6 @@ def replicate_message(secondary, message):
         time.sleep(1)
 
 
-def replicate_to_secondary(message, concern):
-    acked = 0
-    if concern == 1:
-        for secondary in SECONDARY_URLS:
-            replicate_message(secondary, message)
-    else:
-        for secondary in SECONDARY_URLS:
-            responses = replicate_message(secondary, message)
-            if responses:
-                acked += 1
-            if acked >= concern - 1:
-                break
-
-
 @app.route('/messages', methods=['POST'])
 def append_message():
     data = request.json
@@ -46,58 +32,44 @@ def append_message():
     w = data.get("w", 1)  # Default to 1 if not provided
 
     if not msg:
-        return "Message not received", 400
-
+        logger.info(f"Message not received")
+        return jsonify({'error': "message not received"}), 400
+    
     message_id = str(uuid.uuid4())
     message_entry = {"id": message_id, "msg": msg}
     messages.append(message_entry)
+    
+    if w == 1:
+        def replicate_to_all(message_entry):
+            for server in SECONDARY_URLS:
+                threading.Thread(target=replicate_message, args=(server, message_entry)).start()
+        threading.Thread(target=lambda: replicate_to_all(message_entry)).start()
+    else:
+        required_acks = w - 1
+        acks_received = 0
+        threads = []
 
-    replication_thread = threading.Thread(target=replicate_to_secondary, args=(message_entry, w))
-    replication_thread.start()
+        for server in SECONDARY_URLS:
+            thread = threading.Thread(target=replicate_message, args=(server, message_entry))
+            threads.append(thread)
+            thread.start()
+        
+        for thread in threads:
+            thread.join()
+            acks_received += 1
+            if acks_received >= required_acks:
+                break
+        
+        if acks_received < required_acks:
+            return jsonify({'error': 'failed to replicate message to required number of secondaries'}), 500
 
     return jsonify({'status': 'replication started'}), 200
+
 
 @app.route('/messages', methods=['GET'])
 def get_message():
     logger.info("Fetching all logs.")
     return jsonify(messages), 200
-
-# @app.route('/messages', methods=['GET'])
-# def get_messages():
-#     all_messages = messages.copy()
-#     for secondary_url in SECONDARY_URLS:
-#         try:
-#             response = requests.get(f"{secondary_url}/messages")
-#             if response.status_code == 200:
-#                 secondary_messages = response.json()
-#                 all_messages.extend(secondary_messages)
-#             else:
-#                 logger.warning(f"Failed to fetch messages from {secondary_url}.")
-#         except requests.RequestException as e:
-#             logger.error(f"Error fetching messages from {secondary_url}: {e}")
-#     all_messages = list({m["id"]: m for m in all_messages}.values())
-#     return jsonify(all_messages)
-
-
-# if w == 1:
-    #     for secondary in SECONDARY_URLS:
-    #         try:
-    #             response = requests.post(f'{secondary}/replicate', json={'message': message_entry})
-    #             if response.status_code == 200:
-    #                 logger.info(f"Replicated message to {secondary} successfully.")
-    #             else:
-    #                 logger.warning(f"Failed to replicate message to {secondary}.")
-    #         except requests.RequestException as e:
-    #             logger.error(f"Error replicating message to {secondary}: {e}")
-    #             time.sleep(1)
-    # else:
-    #     for secondary in SECONDARY_URLS:
-    #         responses = replicate_message(secondary, message_entry)
-    #         if responses:
-    #             result.append(result)
-    #         if len(responses) >= w - 1:
-    #             break
-
 
 
 if __name__ == '__main__':
